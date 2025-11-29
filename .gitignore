@@ -1,0 +1,7 @@
+dsim_work/**
+
+dsim.env
+dvlcom.env
+dsim.log
+dvlcom.log
+metrics.db
