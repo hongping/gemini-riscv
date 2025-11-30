@@ -69,3 +69,6 @@ To run the simulation, you can use the provided filelists.
 # Example using a generic simulator
 <simulator_command> -f src/rtl/filelist.f -f src/verif/filelist.f
 ```
+
+### DSim
+This repository includes build configuration files for **DSim** (by Ansys). You can use the provided `gemini-riscv.dpf` to set up your simulation environment.

@@ -5,7 +5,7 @@ version: '0.2'
 work_dir: .
 design_root_dir: .
 simulations:
-  - name: helloworld
+  - name: bare_metal_svtb
     options: '-top work.tb_riscv_core'
 source_files:
   - language: verilog
