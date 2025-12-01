@@ -94,7 +94,15 @@ module control_unit (
             end
             OP_BRANCH: begin
                 branch = 1;
-                alu_op = ALU_SUB; // Use SUB to compare
+                case (funct3)
+                    3'b000: alu_op = ALU_SUB;  // BEQ
+                    3'b001: alu_op = ALU_SUB;  // BNE
+                    3'b100: alu_op = ALU_SLT;  // BLT
+                    3'b101: alu_op = ALU_SLT;  // BGE
+                    3'b110: alu_op = ALU_SLTU; // BLTU
+                    3'b111: alu_op = ALU_SLTU; // BGEU
+                    default: alu_op = ALU_SUB;
+                endcase
             end
             OP_JAL: begin
                 jump      = 1;

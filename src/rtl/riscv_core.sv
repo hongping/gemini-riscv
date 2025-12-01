@@ -101,9 +101,12 @@ module riscv_core (
     logic branch_condition_met;
     always_comb begin
         case (funct3)
-            3'b000: branch_condition_met = zero; // BEQ
-            3'b001: branch_condition_met = !zero; // BNE
-            // Others omitted for brevity in this initial pass, treated as false
+            3'b000: branch_condition_met = zero;          // BEQ
+            3'b001: branch_condition_met = !zero;         // BNE
+            3'b100: branch_condition_met = !zero;         // BLT (ALU_SLT: result=1 if a<b, so !zero)
+            3'b101: branch_condition_met = zero;          // BGE (ALU_SLT: result=0 if a>=b, so zero)
+            3'b110: branch_condition_met = !zero;         // BLTU (ALU_SLTU: result=1 if a<b)
+            3'b111: branch_condition_met = zero;          // BGEU (ALU_SLTU: result=0 if a>=b)
             default: branch_condition_met = 0;
         endcase
     end

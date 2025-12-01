@@ -173,10 +173,17 @@ module tb_riscv_core;
         // 8: ADD  x3, x1, x2   (x3 = 30)
         // 12: SW   x3, 100(x0) (Mem[100] = 30)
         // 16: LW   x4, 100(x0) (x4 = 30)
-        // 20: BEQ  x3, x4, 8   (Branch to 28 if x3 == x4)
+        // 20: BEQ  x3, x4, 8   (Branch to 28 if x3 == x4) -> Taken
         // 24: ADDI x5, x0, 1   (Should be skipped)
         // 28: ADDI x5, x0, 2   (x5 = 2)
-        // 32: JAL  x0, 0       (Infinite Loop)
+        // 32: ADDI x6, x0, -5  (x6 = -5)
+        // 36: BLT  x6, x1, 8   (Branch to 44 if -5 < 10) -> Taken
+        // 40: ADDI x7, x0, 1   (Should be skipped)
+        // 44: ADDI x7, x0, 2   (x7 = 2)
+        // 48: BGE  x1, x6, 8   (Branch to 56 if 10 >= -5) -> Taken
+        // 52: ADDI x8, x0, 1   (Should be skipped)
+        // 56: ADDI x8, x0, 2   (x8 = 2)
+        // 60: JAL  x0, 0       (Infinite Loop)
 
         memory[0] = 32'h00a00093; // ADDI x1, x0, 10
         memory[1] = 32'h01400113; // ADDI x2, x0, 20
@@ -186,7 +193,17 @@ module tb_riscv_core;
         memory[5] = 32'h00418463; // BEQ  x3, x4, +8 (offset 8 bytes = 2 instrs) -> PC+8 = 28
         memory[6] = 32'h00100293; // ADDI x5, x0, 1 (Fail case)
         memory[7] = 32'h00200293; // ADDI x5, x0, 2 (Success case)
-        memory[8] = 32'h0000006f; // JAL  x0, 0 (Loop)
+        
+        // New Branch Tests
+        memory[8]  = 32'hffb00313; // ADDI x6, x0, -5 (0xffb)
+        memory[9]  = 32'h00134463; // BLT  x6, x1, +8 (offset 8) -> PC+8 = 44 (word 11)
+        memory[10] = 32'h00100393; // ADDI x7, x0, 1 (Fail case)
+        memory[11] = 32'h00200393; // ADDI x7, x0, 2 (Success case)
+        memory[12] = 32'h0060d463; // BGE  x1, x6, +8 (offset 8) -> PC+8 = 56 (word 14)
+        memory[13] = 32'h00100413; // ADDI x8, x0, 1 (Fail case)
+        memory[14] = 32'h00200413; // ADDI x8, x0, 2 (Success case)
+        
+        memory[15] = 32'h0000006f; // JAL  x0, 0 (Loop)
 
         // Wait for simulation
         #1000;
@@ -203,9 +220,92 @@ module tb_riscv_core;
         $finish;
     end
     
+    // Disassembly Function
+    function string get_disasm(input logic [31:0] instr, input logic valid);
+        logic [6:0] opcode;
+        logic [4:0] rd, rs1, rs2;
+        logic [2:0] funct3;
+        logic [6:0] funct7;
+        logic [31:0] imm_i, imm_s, imm_b, imm_u, imm_j;
+        string instr_str;
+        
+        if (!valid) return "STALL";
+
+        opcode = instr[6:0];
+        rd     = instr[11:7];
+        funct3 = instr[14:12];
+        rs1    = instr[19:15];
+        rs2    = instr[24:20];
+        funct7 = instr[31:25];
+        
+        imm_i = {{20{instr[31]}}, instr[31:20]};
+        imm_s = {{20{instr[31]}}, instr[31:25], instr[11:7]};
+        imm_b = {{19{instr[31]}}, instr[31], instr[7], instr[30:25], instr[11:8], 1'b0};
+        imm_u = {instr[31:12], 12'b0};
+        imm_j = {{11{instr[31]}}, instr[31], instr[19:12], instr[20], instr[30:21], 1'b0};
+
+        case (opcode)
+            7'b0110011: begin // R-Type
+                case (funct3)
+                    3'b000: instr_str = (funct7[5]) ? $sformatf("SUB x%0d, x%0d, x%0d", rd, rs1, rs2) : $sformatf("ADD x%0d, x%0d, x%0d", rd, rs1, rs2);
+                    3'b001: instr_str = $sformatf("SLL x%0d, x%0d, x%0d", rd, rs1, rs2);
+                    3'b010: instr_str = $sformatf("SLT x%0d, x%0d, x%0d", rd, rs1, rs2);
+                    3'b011: instr_str = $sformatf("SLTU x%0d, x%0d, x%0d", rd, rs1, rs2);
+                    3'b100: instr_str = $sformatf("XOR x%0d, x%0d, x%0d", rd, rs1, rs2);
+                    3'b101: instr_str = (funct7[5]) ? $sformatf("SRA x%0d, x%0d, x%0d", rd, rs1, rs2) : $sformatf("SRL x%0d, x%0d, x%0d", rd, rs1, rs2);
+                    3'b110: instr_str = $sformatf("OR x%0d, x%0d, x%0d", rd, rs1, rs2);
+                    3'b111: instr_str = $sformatf("AND x%0d, x%0d, x%0d", rd, rs1, rs2);
+                    default: instr_str = "UNKNOWN_R";
+                endcase
+            end
+            7'b0010011: begin // I-Type
+                case (funct3)
+                    3'b000: instr_str = $sformatf("ADDI x%0d, x%0d, %0d", rd, rs1, $signed(imm_i));
+                    3'b001: instr_str = $sformatf("SLLI x%0d, x%0d, %0d", rd, rs1, imm_i[4:0]);
+                    3'b010: instr_str = $sformatf("SLTI x%0d, x%0d, %0d", rd, rs1, $signed(imm_i));
+                    3'b011: instr_str = $sformatf("SLTIU x%0d, x%0d, %0d", rd, rs1, imm_i);
+                    3'b100: instr_str = $sformatf("XORI x%0d, x%0d, %0d", rd, rs1, $signed(imm_i));
+                    3'b101: instr_str = (imm_i[10]) ? $sformatf("SRAI x%0d, x%0d, %0d", rd, rs1, imm_i[4:0]) : $sformatf("SRLI x%0d, x%0d, %0d", rd, rs1, imm_i[4:0]);
+                    3'b110: instr_str = $sformatf("ORI x%0d, x%0d, %0d", rd, rs1, $signed(imm_i));
+                    3'b111: instr_str = $sformatf("ANDI x%0d, x%0d, %0d", rd, rs1, $signed(imm_i));
+                    default: instr_str = "UNKNOWN_I";
+                endcase
+            end
+            7'b0000011: begin // Load
+                case (funct3)
+                    3'b010: instr_str = $sformatf("LW x%0d, %0d(x%0d)", rd, $signed(imm_i), rs1);
+                    default: instr_str = "UNKNOWN_LOAD";
+                endcase
+            end
+            7'b0100011: begin // Store
+                case (funct3)
+                    3'b010: instr_str = $sformatf("SW x%0d, %0d(x%0d)", rs2, $signed(imm_s), rs1);
+                    default: instr_str = "UNKNOWN_STORE";
+                endcase
+            end
+            7'b1100011: begin // Branch
+                case (funct3)
+                    3'b000: instr_str = $sformatf("BEQ x%0d, x%0d, %0d", rs1, rs2, $signed(imm_b));
+                    3'b001: instr_str = $sformatf("BNE x%0d, x%0d, %0d", rs1, rs2, $signed(imm_b));
+                    3'b100: instr_str = $sformatf("BLT x%0d, x%0d, %0d", rs1, rs2, $signed(imm_b));
+                    3'b101: instr_str = $sformatf("BGE x%0d, x%0d, %0d", rs1, rs2, $signed(imm_b));
+                    3'b110: instr_str = $sformatf("BLTU x%0d, x%0d, %0d", rs1, rs2, $signed(imm_b));
+                    3'b111: instr_str = $sformatf("BGEU x%0d, x%0d, %0d", rs1, rs2, $signed(imm_b));
+                    default: instr_str = "UNKNOWN_BRANCH";
+                endcase
+            end
+            7'b1101111: instr_str = $sformatf("JAL x%0d, %0d", rd, $signed(imm_j));
+            7'b1100111: instr_str = $sformatf("JALR x%0d, x%0d, %0d", rd, rs1, $signed(imm_i));
+            7'b0110111: instr_str = $sformatf("LUI x%0d, 0x%h", rd, imm_u[31:12]);
+            7'b0010111: instr_str = $sformatf("AUIPC x%0d, 0x%h", rd, imm_u[31:12]);
+            default: instr_str = "UNKNOWN_OP";
+        endcase
+        return instr_str;
+    endfunction
+
     // Monitor
     initial begin
-        $monitor("Time=%0t PC=%h Instr=%h", $time, u_core.pc, u_core.instr);
+        $monitor("Time=%0t PC=%h Instr=%h Disasm=%s", $time, u_core.pc, u_core.instr, get_disasm(u_core.instr, u_core.instr_valid));
     end
 
 endmodule
