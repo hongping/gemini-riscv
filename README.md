@@ -25,7 +25,6 @@ The core supports a subset of the RV32I instruction set:
 - SW (Store Word)
 
 ### Branch
-### Branch
 - BEQ, BNE, BLT, BGE, BLTU, BGEU
 
 ### Jump
