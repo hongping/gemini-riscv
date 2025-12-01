@@ -9,6 +9,7 @@ A simplified implementation of a RISC-V processor core in SystemVerilog. This pr
 - **Architecture**:
     - Decoupled Fetch Unit with pre-fetch buffer
     - Simple Control Unit and Datapath
+    - **Execution Model**: Single-cycle execution core with multi-cycle decoupled fetch and memory interface. The core stalls when waiting for instructions or data.
 
 ## Supported Instructions
 The core supports a subset of the RV32I instruction set:
