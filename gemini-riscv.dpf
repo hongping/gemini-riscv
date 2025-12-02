@@ -6,7 +6,7 @@ work_dir: .
 design_root_dir: .
 simulations:
   - name: bare_metal_svtb
-    options: '-top work.tb_riscv_core'
+    options: '-top work.tb_riscv_core +acc+b -waves waves.mxd'
 source_files:
   - language: verilog
     path: src/rtl/filelist.f
